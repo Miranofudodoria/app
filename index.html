@@ -6,7 +6,7 @@
 <style>
   body { font-family: sans-serif; text-align: center; background:#f0f8ff; }
   #game { display: grid; grid-template-columns: repeat(6, 60px); gap: 5px; justify-content: center; margin-top: 20px; }
-  .cell { width: 60px; height: 60px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff; cursor:pointer; }
+  .cell { width: 60px; height: 60px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff; cursor:pointer; user-select:none; }
   #enemy { margin-top:20px; }
   #gauge { width: 300px; height: 20px; border:1px solid #000; margin:10px auto; }
   #gauge-inner { height:100%; width:0%; background:red; }
@@ -25,6 +25,8 @@ const types = ['A','B','C','D'];
 let board = [];
 let hp = 100;
 let gauge = 0;
+let selected = [];
+let dragging = false;
 
 function createBoard(){
   const game = document.getElementById('game');
@@ -38,7 +40,10 @@ function createBoard(){
     cell.style.background = color(type);
     cell.textContent = type;
     cell.dataset.index = i;
-    cell.onclick = () => select(i);
+
+    cell.addEventListener('mousedown', () => startDrag(i));
+    cell.addEventListener('mouseenter', () => dragOver(i));
+
     game.appendChild(cell);
   }
 }
@@ -47,30 +52,47 @@ function color(t){
   return {A:'red',B:'blue',C:'green',D:'purple'}[t];
 }
 
-let selected = [];
+function startDrag(i){
+  dragging = true;
+  clearSelect();
+  selected.push(i);
+  highlight(i);
+}
 
-function select(i){
+function dragOver(i){
+  if(!dragging) return;
   if(selected.includes(i)) return;
-  if(selected.length===0 || board[selected[0]]===board[i]){
+
+  if(board[selected[0]] === board[i]){
     selected.push(i);
-    document.querySelectorAll('.cell')[i].style.opacity = 0.5;
-  } else {
-    clearSelect();
+    highlight(i);
   }
 }
 
-document.addEventListener('mouseup', resolve);
+document.addEventListener('mouseup', endDrag);
 
-function resolve(){
-  if(selected.length>=3){
+function endDrag(){
+  if(!dragging) return;
+  dragging = false;
+
+  if(selected.length >= 3){
     const dmg = selected.length * 2;
     hp -= dmg;
     gauge += selected.length * 5;
+
+    selected.forEach(i => {
+      board[i] = types[Math.floor(Math.random()*types.length)];
+    });
+
     update();
-    selected.forEach(i=> board[i]=types[Math.floor(Math.random()*types.length)]);
   }
+
   clearSelect();
   render();
+}
+
+function highlight(i){
+  document.querySelectorAll('.cell')[i].style.opacity = 0.5;
 }
 
 function clearSelect(){
