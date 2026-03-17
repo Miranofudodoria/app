@@ -2,18 +2,41 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ぷにぷに風ゲーム</title>
+<title>ぷにぷに風ゲーム進化版</title>
 <style>
   body { font-family: sans-serif; text-align: center; background:#f0f8ff; }
   #game { display: grid; grid-template-columns: repeat(6, 60px); gap: 5px; justify-content: center; margin-top: 20px; }
-  .cell { width: 60px; height: 60px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff; cursor:pointer; user-select:none; }
+  .cell {
+    width: 60px; height: 60px; border-radius: 50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; user-select:none;
+    transition: transform 0.1s;
+    animation: wobble 1s infinite;
+    overflow:hidden;
+  }
+
+  .cell img {
+    width: 100%; height: 100%; object-fit: cover;
+    border-radius: 50%;
+  }
+
+  @keyframes wobble {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  .linked {
+    transform: scale(1.2);
+  }
+
   #enemy { margin-top:20px; }
   #gauge { width: 300px; height: 20px; border:1px solid #000; margin:10px auto; }
   #gauge-inner { height:100%; width:0%; background:red; }
 </style>
 </head>
 <body>
-<h1>ぷにぷに風パズル</h1>
+<h1>ぷにぷに風パズル（進化版）</h1>
 <div id="enemy">敵HP: <span id="hp">100</span></div>
 <div id="gauge"><div id="gauge-inner"></div></div>
 <button onclick="special()">必殺技</button>
@@ -22,6 +45,14 @@
 <script>
 const size = 6;
 const types = ['A','B','C','D'];
+
+const images = {
+  A: 'https://i.imgur.com/1Xq9BiB.png',
+  B: 'https://i.imgur.com/8Qf6R5O.png',
+  C: 'https://i.imgur.com/3ZQ3Z4R.png',
+  D: 'https://i.imgur.com/0rVeh4A.png'
+};
+
 let board = [];
 let hp = 100;
 let gauge = 0;
@@ -32,24 +63,24 @@ function createBoard(){
   const game = document.getElementById('game');
   game.innerHTML = '';
   board = [];
+
   for(let i=0;i<size*size;i++){
     const type = types[Math.floor(Math.random()*types.length)];
     board.push(type);
+
     const cell = document.createElement('div');
     cell.className = 'cell';
-    cell.style.background = color(type);
-    cell.textContent = '';
     cell.dataset.index = i;
+
+    const img = document.createElement('img');
+    img.src = images[type];
+    cell.appendChild(img);
 
     cell.addEventListener('mousedown', () => startDrag(i));
     cell.addEventListener('mouseenter', () => dragOver(i));
 
     game.appendChild(cell);
   }
-}
-
-function color(t){
-  return {A:'red',B:'blue',C:'green',D:'purple'}[t];
 }
 
 function startDrag(i){
@@ -92,18 +123,19 @@ function endDrag(){
 }
 
 function highlight(i){
-  document.querySelectorAll('.cell')[i].style.opacity = 0.5;
+  const cell = document.querySelectorAll('.cell')[i];
+  cell.classList.add('linked');
 }
 
 function clearSelect(){
   selected = [];
-  document.querySelectorAll('.cell').forEach(c=>c.style.opacity=1);
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('linked'));
 }
 
 function render(){
   document.querySelectorAll('.cell').forEach((cell,i)=>{
-    cell.textContent = '';
-    cell.style.background = color(board[i]);
+    const img = cell.querySelector('img');
+    img.src = images[board[i]];
   });
 }
 
