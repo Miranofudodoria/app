@@ -2,21 +2,31 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ぷにぷに風ゲーム完成強化版</title>
+<title>ぷにぷに風ゲーム最終版</title>
 <style>
 body { font-family: sans-serif; text-align: center; background:#eaf6ff; }
-#game { position: relative; display: grid; grid-template-columns: repeat(6, 60px); gap: 0px; justify-content: center; margin-top: 20px; border: 4px solid #333; background:#cfe9ff; padding:5px; border-radius:10px; }
+#game {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 60px);
+  grid-template-rows: repeat(6, 60px);
+  gap: 0;
+  width: 360px;
+  height: 360px;
+  margin: 20px auto;
+  border:4px solid #333;
+  background:#cfe9ff;
+  border-radius:10px;
+  overflow: hidden;
+}
 
 .cell {
   width: 60px; height: 60px; border-radius: 50%;
-  margin: 0;
-
-  width: 60px; height: 60px; border-radius: 50%;
   box-shadow: inset -4px -6px 10px rgba(0,0,0,0.2), inset 4px 6px 10px rgba(255,255,255,0.5);
   animation: wobble 1s infinite;
+  transition: transform 0.2s ease, top 0.3s ease, left 0.3s ease;
 }
 
-/* グラデーション */
 .A { background: radial-gradient(circle at 30% 30%, #ff9999, #cc0000); }
 .B { background: radial-gradient(circle at 30% 30%, #9999ff, #0000cc); }
 .C { background: radial-gradient(circle at 30% 30%, #99ff99, #009900); }
@@ -37,9 +47,18 @@ body { font-family: sans-serif; text-align: center; background:#eaf6ff; }
   100% { transform: scale(0); opacity:0; }
 }
 
+.squish {
+  animation: squish 0.2s;
+}
+@keyframes squish {
+  0% { transform: scale(1,1); }
+  50% { transform: scale(1.2,0.8); }
+  100% { transform: scale(1,1); }
+}
+
 #line { position:absolute; top:0; left:0; pointer-events:none; }
 
-#enemy { margin-top:20px; font-weight:bold; }
+#enemy { margin-top:20px; }
 #gauge { width:300px; height:20px; border:1px solid #000; margin:10px auto; }
 #gauge-inner { height:100%; width:0%; background:linear-gradient(to right, orange, red); }
 
@@ -68,7 +87,7 @@ body { font-family: sans-serif; text-align: center; background:#eaf6ff; }
 </style>
 </head>
 <body>
-<h1>ぷにぷに風パズル最終進化</h1>
+<h1>ぷにぷに風パズル最終版</h1>
 <div id="enemy">敵HP: <span id="hp">100</span></div>
 <div id="gauge"><div id="gauge-inner"></div></div>
 <div id="score">スコア: 0</div>
@@ -122,55 +141,39 @@ function createBoard(){
 function getPos(i){
   const el=document.querySelectorAll('.cell')[i];
   const r=el.getBoundingClientRect();
-  return {x:r.left+r.width/2, y:r.top+r.height/2};
+  const gameRect=document.getElementById('game').getBoundingClientRect();
+  return {x:r.left+r.width/2-gameRect.left,y:r.top+r.height/2-gameRect.top};
 }
 
 function drawLine(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   if(selected.length<2) return;
 
-  const gameRect = document.getElementById('game').getBoundingClientRect();
-
   ctx.strokeStyle='orange';
   ctx.lineWidth=10;
   ctx.lineJoin='round';
   ctx.lineCap='round';
 
-  const points = selected.map(i=>{
-    const el = document.querySelectorAll('.cell')[i];
-    const r = el.getBoundingClientRect();
-    return {
-      x: r.left + r.width/2 - gameRect.left,
-      y: r.top + r.height/2 - gameRect.top
-    };
-  });
+  const pts=selected.map(i=>getPos(i));
 
   ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
+  ctx.moveTo(pts[0].x,pts[0].y);
 
-  for(let i=1;i<points.length-1;i++){
-    const xc = (points[i].x + points[i+1].x)/2;
-    const yc = (points[i].y + points[i+1].y)/2;
-    ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+  for(let i=1;i<pts.length-1;i++){
+    const xc=(pts[i].x+pts[i+1].x)/2;
+    const yc=(pts[i].y+pts[i+1].y)/2;
+    ctx.quadraticCurveTo(pts[i].x,pts[i].y,xc,yc);
   }
 
-  // 最後の点
-  const last = points.length-1;
-  ctx.quadraticCurveTo(points[last-1].x, points[last-1].y, points[last].x, points[last].y);
-
+  const last=pts.length-1;
+  ctx.quadraticCurveTo(pts[last-1].x,pts[last-1].y,pts[last].x,pts[last].y);
   ctx.stroke();
 }
 
-function startDrag(i){
-  dragging=true;
-  clearSelect();
-  selected.push(i);
-  highlight(i);
-}
+function startDrag(i){ dragging=true; clearSelect(); selected.push(i); highlight(i);} 
 
 function dragOver(i){
-  if(!dragging) return;
-  if(selected.includes(i)) return;
+  if(!dragging||selected.includes(i)) return;
   if(board[selected[0]]===board[i]){
     selected.push(i);
     highlight(i);
@@ -185,23 +188,22 @@ function endDrag(){
   dragging=false;
 
   if(selected.length>=3){
-    const toRemove = [...selected];
+    const toRemove=[...selected];
     combo++;
-    const base = toRemove.length * 10;
-    const bonus = combo * 5;
-    const total = base + bonus;
-
-    score += total;
-    hp -= toRemove.length * 2;
-    gauge += toRemove.length * 5;
+    const total=toRemove.length*10+combo*5;
+    score+=total;
+    hp-=toRemove.length*2;
+    gauge+=toRemove.length*5;
 
     showScore(total);
 
     toRemove.forEach(i=>{
-      document.querySelectorAll('.cell')[i].classList.add('pop');
+      const el=document.querySelectorAll('.cell')[i];
+      el.classList.add('pop');
     });
 
     setTimeout(()=>{
+      // 縦落下
       for(let col=0;col<size;col++){
         let stack=[];
         for(let row=size-1;row>=0;row--){
@@ -213,12 +215,24 @@ function endDrag(){
           board[idx]=stack.shift()||types[Math.floor(Math.random()*types.length)];
         }
       }
+
+      // 横詰め（左寄せ）
+      let newBoard=[];
+      for(let row=0;row<size;row++){
+        let line=[];
+        for(let col=0;col<size;col++){
+          line.push(board[row*size+col]);
+        }
+        line=line.filter(v=>v!=null);
+        while(line.length<size) line.push(types[Math.floor(Math.random()*types.length)]);
+        newBoard.push(...line);
+      }
+      board=newBoard;
+
+      render(true);
       update();
-      render();
     },250);
-  } else {
-    combo = 0;
-  }
+  } else combo=0;
 
   clearSelect();
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -234,18 +248,17 @@ function showScore(val){
   setTimeout(()=>el.remove(),1000);
 }
 
-function highlight(i){
-  document.querySelectorAll('.cell')[i].classList.add('linked');
-}
+function highlight(i){ document.querySelectorAll('.cell')[i].classList.add('linked'); }
 
-function clearSelect(){
-  selected=[];
-  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('linked','pop'));
-}
+function clearSelect(){ selected=[]; document.querySelectorAll('.cell').forEach(c=>c.classList.remove('linked','pop')); }
 
-function render(){
+function render(squish=false){
   document.querySelectorAll('.cell').forEach((cell,i)=>{
     cell.className='cell '+board[i];
+    if(squish){
+      cell.classList.add('squish');
+      setTimeout(()=>cell.classList.remove('squish'),200);
+    }
   });
 }
 
@@ -263,7 +276,6 @@ function special(){
     hp-=30;
     gauge=0;
     update();
-
     const flash=document.createElement('div');
     flash.className='flash';
     document.body.appendChild(flash);
