@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ダダサバ風 無限フィールド版</title>
+<title>ダダサバ風 改良版</title>
 <style>
 body{margin:0;background:#0d0d0d;color:#fff;font-family:sans-serif;text-align:center}
 canvas{background:#111;display:block;margin:10px auto;border:3px solid #fff}
@@ -11,114 +11,137 @@ canvas{background:#111;display:block;margin:10px auto;border:3px solid #fff}
 .bar{height:10px;background:#333;margin-top:5px}
 #hp{background:#0f0;height:10px}
 #xp{background:#0ff;height:6px}
+#overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.8)}
+#card{background:#222;padding:20px;border-radius:12px}
+button{margin:5px;padding:10px}
 </style>
 </head>
 <body>
-<h2>無限フィールド版</h2>
+<h2>改良版（追尾＋XP強化）</h2>
 <div id="ui">HP<div class="bar"><div id="hp"></div></div>XP<div class="bar"><div id="xp"></div></div></div>
 <canvas id="game" width="400" height="600"></canvas>
+<div id="overlay"><div id="card"><h3>スキル選択</h3><div id="choices"></div></div></div>
 <script>
 const c=document.getElementById("game"),ctx=c.getContext("2d");
 
-let player={x:0,y:0,size:12,hp:100,maxHp:100,xp:0};
+let player={x:0,y:0,size:12,hp:100,maxHp:100,xp:0,lvl:1};
 let camera={x:0,y:0};
-let enemies=[],bullets=[];
-let keys={},time=0;
+let enemies=[],bullets=[],xpOrbs=[];
+let keys={},time=0,fireRate=300;
+
+const overlay=document.getElementById("overlay");
+const choices=document.getElementById("choices");
 
 document.addEventListener("keydown",e=>keys[e.key]=true);
 document.addEventListener("keyup",e=>keys[e.key]=false);
 
-// 弾
+// 自動攻撃（追尾）
 setInterval(()=>{
- bullets.push({x:player.x,y:player.y,dx:0,dy:-1,speed:5});
-},300);
+ if(enemies.length===0) return;
+ let target=enemies.reduce((a,b)=>{
+  let da=Math.hypot(player.x-a.x,player.y-a.y);
+  let db=Math.hypot(player.x-b.x,player.y-b.y);
+  return da<db?a:b;
+ });
+ let dx=target.x-player.x;
+ let dy=target.y-player.y;
+ let d=Math.hypot(dx,dy);
+ bullets.push({x:player.x,y:player.y,dx:dx/d,dy:dy/d,speed:6});
+},fireRate);
 
-// 四方から敵生成
+// 敵（四方）
 setInterval(()=>{
- let angle=Math.random()*Math.PI*2;
+ let ang=Math.random()*Math.PI*2;
  let dist=300+Math.random()*200;
- let ex=player.x+Math.cos(angle)*dist;
- let ey=player.y+Math.sin(angle)*dist;
- enemies.push({x:ex,y:ey,size:10,speed:1+time/60});
+ enemies.push({x:player.x+Math.cos(ang)*dist,y:player.y+Math.sin(ang)*dist,size:10,speed:1+time/60});
 },300);
 
 function update(){
  time+=1/60;
 
- // 移動
  if(keys.ArrowLeft)player.x-=4;
  if(keys.ArrowRight)player.x+=4;
  if(keys.ArrowUp)player.y-=4;
  if(keys.ArrowDown)player.y+=4;
 
- // カメラ追従
- camera.x=player.x;
- camera.y=player.y;
+ camera.x=player.x; camera.y=player.y;
 
- // 弾
- bullets.forEach(b=>{
-  b.x+=b.dx*b.speed;
-  b.y+=b.dy*b.speed;
- });
+ bullets.forEach(b=>{b.x+=b.dx*b.speed; b.y+=b.dy*b.speed;});
 
- // 敵はプレイヤーに向かう
  enemies.forEach(e=>{
-  let dx=player.x-e.x;
-  let dy=player.y-e.y;
-  let d=Math.hypot(dx,dy);
-  e.x+=dx/d*e.speed;
-  e.y+=dy/d*e.speed;
+  let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
+  e.x+=dx/d*e.speed; e.y+=dy/d*e.speed;
  });
 
- // 衝突
+ // XP吸収
+ xpOrbs.forEach((o,oi)=>{
+  let dx=player.x-o.x,dy=player.y-o.y,d=Math.hypot(dx,dy);
+  if(d<80){ o.x+=dx/d*3; o.y+=dy/d*3; }
+  if(d<15){ xpOrbs.splice(oi,1); gainXP(10); }
+ });
+
  enemies.forEach((e,ei)=>{
   bullets.forEach((b,bi)=>{
     if(Math.hypot(e.x-b.x,e.y-b.y)<12){
       enemies.splice(ei,1);
       bullets.splice(bi,1);
-      player.xp+=10;
+      xpOrbs.push({x:e.x,y:e.y});
     }
   });
-
-  if(Math.hypot(player.x-e.x,player.y-e.y)<15){
-    player.hp-=1;
-  }
+  if(Math.hypot(player.x-e.x,player.y-e.y)<15){ player.hp-=1; }
  });
+}
+
+function gainXP(v){
+ player.xp+=v;
+ if(player.xp>=100){
+  player.xp=0;
+  player.lvl++;
+  levelUp();
+ }
+}
+
+function levelUp(){
+ overlay.style.display="flex";
+ let skills=["攻撃速度UP","弾サイズUP","回復"];
+ choices.innerHTML="";
+ skills.sort(()=>0.5-Math.random()).slice(0,3).forEach(s=>{
+  let b=document.createElement("button");
+  b.textContent=s;
+  b.onclick=()=>selectSkill(s);
+  choices.appendChild(b);
+ });
+}
+
+function selectSkill(s){
+ if(s==="攻撃速度UP") fireRate=Math.max(100,fireRate-50);
+ if(s==="弾サイズUP") bullets.forEach(b=>b.size=8);
+ if(s==="回復") player.hp=Math.min(player.maxHp,player.hp+30);
+ overlay.style.display="none";
 }
 
 function draw(){
  ctx.clearRect(0,0,400,600);
+ let ox=200-camera.x, oy=300-camera.y;
 
- // オフセット（カメラ）
- let ox=200-camera.x;
- let oy=300-camera.y;
-
- // プレイヤー
  ctx.fillStyle="#0f0";
- ctx.beginPath();
- ctx.arc(player.x+ox,player.y+oy,player.size,0,Math.PI*2);
- ctx.fill();
+ ctx.beginPath(); ctx.arc(player.x+ox,player.y+oy,player.size,0,Math.PI*2); ctx.fill();
 
- // 弾
  ctx.fillStyle="#ff0";
- bullets.forEach(b=>{
-  ctx.fillRect(b.x+ox-2,b.y+oy-5,4,10);
- });
+ bullets.forEach(b=>ctx.fillRect(b.x+ox-2,b.y+oy-5,4,10));
 
- // 敵
  ctx.fillStyle="#f00";
- enemies.forEach(e=>{
-  ctx.beginPath();
-  ctx.arc(e.x+ox,e.y+oy,e.size,0,Math.PI*2);
-  ctx.fill();
- });
+ enemies.forEach(e=>{ctx.beginPath();ctx.arc(e.x+ox,e.y+oy,e.size,0,Math.PI*2);ctx.fill();});
 
- // UI
+ ctx.fillStyle="#0ff";
+ xpOrbs.forEach(o=>{ctx.beginPath();ctx.arc(o.x+ox,o.y+oy,5,0,Math.PI*2);ctx.fill();});
+
  hp.style.width=(player.hp/player.maxHp*100)+"%";
- xp.style.width=(player.xp%100)+"%";
+ xp.style.width=(player.xp)+"%";
 }
 
 function loop(){update();draw();requestAnimationFrame(loop);}loop();
 </script>
 </body>
 </html>
+
