@@ -2,55 +2,68 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ぷにぷに風ゲーム進化版</title>
+<title>ぷにぷに風ゲーム完全版（画像なし）</title>
 <style>
-  body { font-family: sans-serif; text-align: center; background:#f0f8ff; }
-  #game { display: grid; grid-template-columns: repeat(6, 60px); gap: 5px; justify-content: center; margin-top: 20px; }
-  .cell {
-    width: 60px; height: 60px; border-radius: 50%;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer; user-select:none;
-    transition: transform 0.1s;
-    animation: wobble 1s infinite;
-    overflow:hidden;
-  }
+body { font-family: sans-serif; text-align: center; background:#f0f8ff; }
+#game { position: relative; display: grid; grid-template-columns: repeat(6, 60px); gap: 5px; justify-content: center; margin-top: 20px; }
+.cell {
+  width: 60px; height: 60px; border-radius: 50%;
+  animation: wobble 1s infinite;
+}
 
-  .cell img {
-    width: 100%; height: 100%; object-fit: cover;
-    border-radius: 50%;
-  }
+@keyframes wobble {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
 
-  @keyframes wobble {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-  }
+.linked { transform: scale(1.2); }
 
-  .linked {
-    transform: scale(1.2);
-  }
+.pop { animation: pop 0.2s forwards; }
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(0); opacity:0; }
+}
 
-  #enemy { margin-top:20px; }
-  #gauge { width: 300px; height: 20px; border:1px solid #000; margin:10px auto; }
-  #gauge-inner { height:100%; width:0%; background:red; }
+#line {
+  position:absolute;
+  top:0; left:0;
+  pointer-events:none;
+}
+
+#enemy { margin-top:20px; }
+#gauge { width:300px; height:20px; border:1px solid #000; margin:10px auto; }
+#gauge-inner { height:100%; width:0%; background:red; }
+
+.flash {
+  position:fixed;
+  top:0; left:0; width:100%; height:100%;
+  background:rgba(255,255,0,0.4);
+  animation: flash 0.5s;
+}
+@keyframes flash {
+  from { opacity:1; }
+  to { opacity:0; }
+}
 </style>
 </head>
 <body>
-<h1>ぷにぷに風パズル（進化版）</h1>
+<h1>ぷにぷに風パズル（画像なし）</h1>
 <div id="enemy">敵HP: <span id="hp">100</span></div>
 <div id="gauge"><div id="gauge-inner"></div></div>
 <button onclick="special()">必殺技</button>
 <div id="game"></div>
+<canvas id="line"></canvas>
 
 <script>
 const size = 6;
 const types = ['A','B','C','D'];
-
-const images = {
-  A: 'https://i.imgur.com/1Xq9BiB.png',
-  B: 'https://i.imgur.com/8Qf6R5O.png',
-  C: 'https://i.imgur.com/3ZQ3Z4R.png',
-  D: 'https://i.imgur.com/0rVeh4A.png'
+const colors = {
+  A: 'red',
+  B: 'blue',
+  C: 'green',
+  D: 'purple'
 };
 
 let board = [];
@@ -58,6 +71,16 @@ let hp = 100;
 let gauge = 0;
 let selected = [];
 let dragging = false;
+
+const canvas = document.getElementById('line');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
 
 function createBoard(){
   const game = document.getElementById('game');
@@ -69,22 +92,39 @@ function createBoard(){
     board.push(type);
 
     const cell = document.createElement('div');
-    cell.className = 'cell';
-    cell.dataset.index = i;
+    cell.className='cell';
+    cell.style.background = colors[type];
+    cell.dataset.index=i;
 
-    const img = document.createElement('img');
-    img.src = images[type];
-    cell.appendChild(img);
-
-    cell.addEventListener('mousedown', () => startDrag(i));
-    cell.addEventListener('mouseenter', () => dragOver(i));
+    cell.addEventListener('mousedown',()=>startDrag(i));
+    cell.addEventListener('mouseenter',()=>dragOver(i));
 
     game.appendChild(cell);
   }
 }
 
+function getPos(i){
+  const el=document.querySelectorAll('.cell')[i];
+  const r=el.getBoundingClientRect();
+  return {x:r.left+r.width/2, y:r.top+r.height/2};
+}
+
+function drawLine(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(selected.length<2) return;
+  ctx.strokeStyle='orange';
+  ctx.lineWidth=8;
+  ctx.beginPath();
+  selected.forEach((i,idx)=>{
+    const p=getPos(i);
+    if(idx===0) ctx.moveTo(p.x,p.y);
+    else ctx.lineTo(p.x,p.y);
+  });
+  ctx.stroke();
+}
+
 function startDrag(i){
-  dragging = true;
+  dragging=true;
   clearSelect();
   selected.push(i);
   highlight(i);
@@ -93,10 +133,10 @@ function startDrag(i){
 function dragOver(i){
   if(!dragging) return;
   if(selected.includes(i)) return;
-
-  if(board[selected[0]] === board[i]){
+  if(board[selected[0]]===board[i]){
     selected.push(i);
     highlight(i);
+    drawLine();
   }
 }
 
@@ -104,53 +144,72 @@ document.addEventListener('mouseup', endDrag);
 
 function endDrag(){
   if(!dragging) return;
-  dragging = false;
+  dragging=false;
 
-  if(selected.length >= 3){
-    const dmg = selected.length * 2;
-    hp -= dmg;
-    gauge += selected.length * 5;
-
-    selected.forEach(i => {
-      board[i] = types[Math.floor(Math.random()*types.length)];
+  if(selected.length>=3){
+    selected.forEach(i=>{
+      const el=document.querySelectorAll('.cell')[i];
+      el.classList.add('pop');
     });
 
-    update();
+    setTimeout(()=>{
+      const dmg=selected.length*2;
+      hp-=dmg;
+      gauge+=selected.length*5;
+
+      for(let col=0;col<size;col++){
+        let stack=[];
+        for(let row=size-1;row>=0;row--){
+          let idx=row*size+col;
+          if(!selected.includes(idx)) stack.push(board[idx]);
+        }
+        for(let row=size-1;row>=0;row--){
+          let idx=row*size+col;
+          board[idx]=stack.shift()||types[Math.floor(Math.random()*types.length)];
+        }
+      }
+
+      update();
+      render();
+    },200);
   }
 
   clearSelect();
-  render();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
 function highlight(i){
-  const cell = document.querySelectorAll('.cell')[i];
-  cell.classList.add('linked');
+  document.querySelectorAll('.cell')[i].classList.add('linked');
 }
 
 function clearSelect(){
-  selected = [];
-  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('linked'));
+  selected=[];
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('linked','pop'));
 }
 
 function render(){
   document.querySelectorAll('.cell').forEach((cell,i)=>{
-    const img = cell.querySelector('img');
-    img.src = images[board[i]];
+    cell.style.background = colors[board[i]];
   });
 }
 
 function update(){
   if(hp<0) hp=0;
   if(gauge>100) gauge=100;
-  document.getElementById('hp').textContent = hp;
-  document.getElementById('gauge-inner').style.width = gauge+'%';
+  document.getElementById('hp').textContent=hp;
+  document.getElementById('gauge-inner').style.width=gauge+'%';
 }
 
 function special(){
   if(gauge>=100){
-    hp -= 30;
-    gauge = 0;
+    hp-=30;
+    gauge=0;
     update();
+
+    const flash=document.createElement('div');
+    flash.className='flash';
+    document.body.appendChild(flash);
+    setTimeout(()=>flash.remove(),500);
   }
 }
 
