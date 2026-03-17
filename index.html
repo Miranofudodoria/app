@@ -38,7 +38,7 @@ function createBoard(){
     const cell = document.createElement('div');
     cell.className = 'cell';
     cell.style.background = color(type);
-    cell.textContent = type;
+    cell.textContent = '';
     cell.dataset.index = i;
 
     cell.addEventListener('mousedown', () => startDrag(i));
@@ -102,7 +102,7 @@ function clearSelect(){
 
 function render(){
   document.querySelectorAll('.cell').forEach((cell,i)=>{
-    cell.textContent = board[i];
+    cell.textContent = '';
     cell.style.background = color(board[i]);
   });
 }
@@ -126,3 +126,4 @@ createBoard();
 </script>
 </body>
 </html>
+
