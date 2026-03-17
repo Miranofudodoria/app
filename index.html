@@ -2,39 +2,55 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ぷにぷに風ゲーム完全版（画像なし）</title>
+<title>ぷにぷに風ゲーム完成強化版</title>
 <style>
-body { font-family: sans-serif; text-align: center; background:#f0f8ff; }
-#game { position: relative; display: grid; grid-template-columns: repeat(6, 60px); gap: 5px; justify-content: center; margin-top: 20px; }
+body { font-family: sans-serif; text-align: center; background:#eaf6ff; }
+#game { position: relative; display: grid; grid-template-columns: repeat(6, 60px); gap: 8px; justify-content: center; margin-top: 20px; }
+
 .cell {
   width: 60px; height: 60px; border-radius: 50%;
+  box-shadow: inset -4px -6px 10px rgba(0,0,0,0.2), inset 4px 6px 10px rgba(255,255,255,0.5);
   animation: wobble 1s infinite;
 }
 
+/* グラデーション */
+.A { background: radial-gradient(circle at 30% 30%, #ff9999, #cc0000); }
+.B { background: radial-gradient(circle at 30% 30%, #9999ff, #0000cc); }
+.C { background: radial-gradient(circle at 30% 30%, #99ff99, #009900); }
+.D { background: radial-gradient(circle at 30% 30%, #cc99ff, #6600cc); }
+
 @keyframes wobble {
   0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  50% { transform: scale(1.08); }
   100% { transform: scale(1); }
 }
 
-.linked { transform: scale(1.2); }
+.linked { transform: scale(1.25); }
 
-.pop { animation: pop 0.2s forwards; }
+.pop { animation: pop 0.25s forwards; }
 @keyframes pop {
   0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
+  60% { transform: scale(1.5); }
   100% { transform: scale(0); opacity:0; }
 }
 
-#line {
-  position:absolute;
-  top:0; left:0;
-  pointer-events:none;
-}
+#line { position:absolute; top:0; left:0; pointer-events:none; }
 
-#enemy { margin-top:20px; }
+#enemy { margin-top:20px; font-weight:bold; }
 #gauge { width:300px; height:20px; border:1px solid #000; margin:10px auto; }
-#gauge-inner { height:100%; width:0%; background:red; }
+#gauge-inner { height:100%; width:0%; background:linear-gradient(to right, orange, red); }
+
+#score, #combo { font-size:20px; margin-top:10px; }
+
+.floating {
+  position:absolute;
+  font-weight:bold;
+  animation: floatUp 1s forwards;
+}
+@keyframes floatUp {
+  0% { opacity:1; transform:translateY(0); }
+  100% { opacity:0; transform:translateY(-50px); }
+}
 
 .flash {
   position:fixed;
@@ -49,9 +65,11 @@ body { font-family: sans-serif; text-align: center; background:#f0f8ff; }
 </style>
 </head>
 <body>
-<h1>ぷにぷに風パズル（画像なし）</h1>
+<h1>ぷにぷに風パズル最終進化</h1>
 <div id="enemy">敵HP: <span id="hp">100</span></div>
 <div id="gauge"><div id="gauge-inner"></div></div>
+<div id="score">スコア: 0</div>
+<div id="combo">コンボ: 0</div>
 <button onclick="special()">必殺技</button>
 <div id="game"></div>
 <canvas id="line"></canvas>
@@ -59,16 +77,12 @@ body { font-family: sans-serif; text-align: center; background:#f0f8ff; }
 <script>
 const size = 6;
 const types = ['A','B','C','D'];
-const colors = {
-  A: 'red',
-  B: 'blue',
-  C: 'green',
-  D: 'purple'
-};
 
 let board = [];
 let hp = 100;
 let gauge = 0;
+let score = 0;
+let combo = 0;
 let selected = [];
 let dragging = false;
 
@@ -92,8 +106,7 @@ function createBoard(){
     board.push(type);
 
     const cell = document.createElement('div');
-    cell.className='cell';
-    cell.style.background = colors[type];
+    cell.className='cell '+type;
     cell.dataset.index=i;
 
     cell.addEventListener('mousedown',()=>startDrag(i));
@@ -147,35 +160,53 @@ function endDrag(){
   dragging=false;
 
   if(selected.length>=3){
-    selected.forEach(i=>{
-      const el=document.querySelectorAll('.cell')[i];
-      el.classList.add('pop');
+    const toRemove = [...selected];
+    combo++;
+    const base = toRemove.length * 10;
+    const bonus = combo * 5;
+    const total = base + bonus;
+
+    score += total;
+    hp -= toRemove.length * 2;
+    gauge += toRemove.length * 5;
+
+    showScore(total);
+
+    toRemove.forEach(i=>{
+      document.querySelectorAll('.cell')[i].classList.add('pop');
     });
 
     setTimeout(()=>{
-      const dmg=selected.length*2;
-      hp-=dmg;
-      gauge+=selected.length*5;
-
       for(let col=0;col<size;col++){
         let stack=[];
         for(let row=size-1;row>=0;row--){
           let idx=row*size+col;
-          if(!selected.includes(idx)) stack.push(board[idx]);
+          if(!toRemove.includes(idx)) stack.push(board[idx]);
         }
         for(let row=size-1;row>=0;row--){
           let idx=row*size+col;
           board[idx]=stack.shift()||types[Math.floor(Math.random()*types.length)];
         }
       }
-
       update();
       render();
-    },200);
+    },250);
+  } else {
+    combo = 0;
   }
 
   clearSelect();
   ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+function showScore(val){
+  const el=document.createElement('div');
+  el.className='floating';
+  el.textContent='+'+val;
+  el.style.left='50%';
+  el.style.top='50%';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1000);
 }
 
 function highlight(i){
@@ -189,7 +220,7 @@ function clearSelect(){
 
 function render(){
   document.querySelectorAll('.cell').forEach((cell,i)=>{
-    cell.style.background = colors[board[i]];
+    cell.className='cell '+board[i];
   });
 }
 
@@ -198,6 +229,8 @@ function update(){
   if(gauge>100) gauge=100;
   document.getElementById('hp').textContent=hp;
   document.getElementById('gauge-inner').style.width=gauge+'%';
+  document.getElementById('score').textContent='スコア: '+score;
+  document.getElementById('combo').textContent='コンボ: '+combo;
 }
 
 function special(){
