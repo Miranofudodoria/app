@@ -5,9 +5,12 @@
 <title>ぷにぷに風ゲーム完成強化版</title>
 <style>
 body { font-family: sans-serif; text-align: center; background:#eaf6ff; }
-#game { position: relative; display: grid; grid-template-columns: repeat(6, 60px); gap: 8px; justify-content: center; margin-top: 20px; }
+#game { position: relative; display: grid; grid-template-columns: repeat(6, 60px); gap: 0px; justify-content: center; margin-top: 20px; border: 4px solid #333; background:#cfe9ff; padding:5px; border-radius:10px; }
 
 .cell {
+  width: 60px; height: 60px; border-radius: 50%;
+  margin: 0;
+
   width: 60px; height: 60px; border-radius: 50%;
   box-shadow: inset -4px -6px 10px rgba(0,0,0,0.2), inset 4px 6px 10px rgba(255,255,255,0.5);
   animation: wobble 1s infinite;
@@ -125,14 +128,36 @@ function getPos(i){
 function drawLine(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   if(selected.length<2) return;
+
+  const gameRect = document.getElementById('game').getBoundingClientRect();
+
   ctx.strokeStyle='orange';
-  ctx.lineWidth=8;
-  ctx.beginPath();
-  selected.forEach((i,idx)=>{
-    const p=getPos(i);
-    if(idx===0) ctx.moveTo(p.x,p.y);
-    else ctx.lineTo(p.x,p.y);
+  ctx.lineWidth=10;
+  ctx.lineJoin='round';
+  ctx.lineCap='round';
+
+  const points = selected.map(i=>{
+    const el = document.querySelectorAll('.cell')[i];
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left + r.width/2 - gameRect.left,
+      y: r.top + r.height/2 - gameRect.top
+    };
   });
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+
+  for(let i=1;i<points.length-1;i++){
+    const xc = (points[i].x + points[i+1].x)/2;
+    const yc = (points[i].y + points[i+1].y)/2;
+    ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+  }
+
+  // 最後の点
+  const last = points.length-1;
+  ctx.quadraticCurveTo(points[last-1].x, points[last-1].y, points[last].x, points[last].y);
+
   ctx.stroke();
 }
 
