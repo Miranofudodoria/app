@@ -2,288 +2,195 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ぷにぷに風ゲーム最終版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ダダサバ風ゲーム 強化版</title>
 <style>
-body { font-family: sans-serif; text-align: center; background:#eaf6ff; }
-#game {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(6, 60px);
-  grid-template-rows: repeat(6, 60px);
-  gap: 0;
-  width: 360px;
-  height: 360px;
-  margin: 20px auto;
-  border:4px solid #333;
-  background:#cfe9ff;
-  border-radius:10px;
-  overflow: hidden;
-}
-
-.cell {
-  width: 60px; height: 60px; border-radius: 50%;
-  box-shadow: inset -4px -6px 10px rgba(0,0,0,0.2), inset 4px 6px 10px rgba(255,255,255,0.5);
-  animation: wobble 1s infinite;
-  transition: transform 0.2s ease, top 0.3s ease, left 0.3s ease;
-}
-
-.A { background: radial-gradient(circle at 30% 30%, #ff9999, #cc0000); }
-.B { background: radial-gradient(circle at 30% 30%, #9999ff, #0000cc); }
-.C { background: radial-gradient(circle at 30% 30%, #99ff99, #009900); }
-.D { background: radial-gradient(circle at 30% 30%, #cc99ff, #6600cc); }
-
-@keyframes wobble {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.08); }
-  100% { transform: scale(1); }
-}
-
-.linked { transform: scale(1.25); }
-
-.pop { animation: pop 0.25s forwards; }
-@keyframes pop {
-  0% { transform: scale(1); }
-  60% { transform: scale(1.5); }
-  100% { transform: scale(0); opacity:0; }
-}
-
-.squish {
-  animation: squish 0.2s;
-}
-@keyframes squish {
-  0% { transform: scale(1,1); }
-  50% { transform: scale(1.2,0.8); }
-  100% { transform: scale(1,1); }
-}
-
-#line { position:absolute; top:0; left:0; pointer-events:none; }
-
-#enemy { margin-top:20px; }
-#gauge { width:300px; height:20px; border:1px solid #000; margin:10px auto; }
-#gauge-inner { height:100%; width:0%; background:linear-gradient(to right, orange, red); }
-
-#score, #combo { font-size:20px; margin-top:10px; }
-
-.floating {
-  position:absolute;
-  font-weight:bold;
-  animation: floatUp 1s forwards;
-}
-@keyframes floatUp {
-  0% { opacity:1; transform:translateY(0); }
-  100% { opacity:0; transform:translateY(-50px); }
-}
-
-.flash {
-  position:fixed;
-  top:0; left:0; width:100%; height:100%;
-  background:rgba(255,255,0,0.4);
-  animation: flash 0.5s;
-}
-@keyframes flash {
-  from { opacity:1; }
-  to { opacity:0; }
-}
+  body { margin:0; background:#111; color:#fff; font-family:sans-serif; text-align:center; }
+  canvas { background:#1a1a1a; display:block; margin:10px auto; border:3px solid #fff; }
+  #ui { width:400px; margin:0 auto; text-align:left; }
+  #bar { height:10px; background:#333; margin-top:5px; }
+  #hp { height:10px; background:#0f0; width:100%; }
+  #xp { height:6px; background:#0ff; width:0%; }
+  #overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.7); }
+  #card { background:#222; padding:20px; border-radius:12px; }
+  button { margin:5px; padding:10px; }
 </style>
 </head>
 <body>
-<h1>ぷにぷに風パズル最終版</h1>
-<div id="enemy">敵HP: <span id="hp">100</span></div>
-<div id="gauge"><div id="gauge-inner"></div></div>
-<div id="score">スコア: 0</div>
-<div id="combo">コンボ: 0</div>
-<button onclick="special()">必殺技</button>
-<div id="game"></div>
-<canvas id="line"></canvas>
+<h2>ダダサバ風 強化版</h2>
+<div id="ui">
+  HP
+  <div id="bar"><div id="hp"></div></div>
+  XP
+  <div id="bar"><div id="xp"></div></div>
+</div>
+<canvas id="game" width="400" height="600"></canvas>
+
+<div id="overlay">
+  <div id="card">
+    <h3>スキル選択</h3>
+    <div id="choices"></div>
+  </div>
+</div>
 
 <script>
-const size = 6;
-const types = ['A','B','C','D'];
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
 
-let board = [];
-let hp = 100;
-let gauge = 0;
-let score = 0;
-let combo = 0;
-let selected = [];
-let dragging = false;
+let player = { x:200, y:500, size:12, hp:100, maxHp:100, xp:0, lvl:1 };
+let bullets=[], enemies=[], drones=[];
+let keys={};
+let gameOver=false;
 
-const canvas = document.getElementById('line');
-const ctx = canvas.getContext('2d');
+// 入力
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
 
-function resizeCanvas(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+// 弾
+setInterval(()=>{
+  bullets.push({x:player.x,y:player.y,speed:5});
+},300);
 
-function createBoard(){
-  const game = document.getElementById('game');
-  game.innerHTML = '';
-  board = [];
+// 敵
+setInterval(()=>{
+  enemies.push({x:Math.random()*380+10,y:0,size:10,speed:1+Math.random()*1.5, vx:(Math.random()-.5)*1});
+},600);
 
-  for(let i=0;i<size*size;i++){
-    const type = types[Math.floor(Math.random()*types.length)];
-    board.push(type);
+function update(){
+  if(gameOver) return;
 
-    const cell = document.createElement('div');
-    cell.className='cell '+type;
-    cell.dataset.index=i;
+  // 移動
+  if(keys["ArrowLeft"]) player.x-=4;
+  if(keys["ArrowRight"]) player.x+=4;
+  if(keys["ArrowUp"]) player.y-=4;
+  if(keys["ArrowDown"]) player.y+=4;
 
-    cell.addEventListener('mousedown',()=>startDrag(i));
-    cell.addEventListener('mouseenter',()=>dragOver(i));
+  // 弾
+  bullets.forEach(b=>b.y-=b.speed);
 
-    game.appendChild(cell);
-  }
-}
+  // ドローン
+  drones.forEach((d,i)=>{
+    let angle=Date.now()/500+i;
+    d.x=player.x+Math.cos(angle)*30;
+    d.y=player.y+Math.sin(angle)*30;
+    if(Math.random()<0.1) bullets.push({x:d.x,y:d.y,speed:6});
+  });
 
-function getPos(i){
-  const el=document.querySelectorAll('.cell')[i];
-  const r=el.getBoundingClientRect();
-  const gameRect=document.getElementById('game').getBoundingClientRect();
-  return {x:r.left+r.width/2-gameRect.left,y:r.top+r.height/2-gameRect.top};
-}
+  // 敵（横詰まり）
+  enemies.forEach(e=>{
+    e.y+=e.speed;
+    e.x+=e.vx;
+    if(e.x<10||e.x>390) e.vx*=-1;
+  });
 
-function drawLine(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(selected.length<2) return;
-
-  ctx.strokeStyle='orange';
-  ctx.lineWidth=10;
-  ctx.lineJoin='round';
-  ctx.lineCap='round';
-
-  const pts=selected.map(i=>getPos(i));
-
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x,pts[0].y);
-
-  for(let i=1;i<pts.length-1;i++){
-    const xc=(pts[i].x+pts[i+1].x)/2;
-    const yc=(pts[i].y+pts[i+1].y)/2;
-    ctx.quadraticCurveTo(pts[i].x,pts[i].y,xc,yc);
-  }
-
-  const last=pts.length-1;
-  ctx.quadraticCurveTo(pts[last-1].x,pts[last-1].y,pts[last].x,pts[last].y);
-  ctx.stroke();
-}
-
-function startDrag(i){ dragging=true; clearSelect(); selected.push(i); highlight(i);} 
-
-function dragOver(i){
-  if(!dragging||selected.includes(i)) return;
-  if(board[selected[0]]===board[i]){
-    selected.push(i);
-    highlight(i);
-    drawLine();
-  }
-}
-
-document.addEventListener('mouseup', endDrag);
-
-function endDrag(){
-  if(!dragging) return;
-  dragging=false;
-
-  if(selected.length>=3){
-    const toRemove=[...selected];
-    combo++;
-    const total=toRemove.length*10+combo*5;
-    score+=total;
-    hp-=toRemove.length*2;
-    gauge+=toRemove.length*5;
-
-    showScore(total);
-
-    toRemove.forEach(i=>{
-      const el=document.querySelectorAll('.cell')[i];
-      el.classList.add('pop');
+  // 衝突
+  enemies.forEach((e,ei)=>{
+    bullets.forEach((b,bi)=>{
+      let dx=b.x-e.x, dy=b.y-e.y;
+      if(Math.hypot(dx,dy)<12){
+        bullets.splice(bi,1);
+        enemies.splice(ei,1);
+        gainXP(10);
+      }
     });
 
-    setTimeout(()=>{
-      // 縦落下
-      for(let col=0;col<size;col++){
-        let stack=[];
-        for(let row=size-1;row>=0;row--){
-          let idx=row*size+col;
-          if(!toRemove.includes(idx)) stack.push(board[idx]);
-        }
-        for(let row=size-1;row>=0;row--){
-          let idx=row*size+col;
-          board[idx]=stack.shift()||types[Math.floor(Math.random()*types.length)];
-        }
-      }
-
-      // 横詰め（左寄せ）
-      let newBoard=[];
-      for(let row=0;row<size;row++){
-        let line=[];
-        for(let col=0;col<size;col++){
-          line.push(board[row*size+col]);
-        }
-        line=line.filter(v=>v!=null);
-        while(line.length<size) line.push(types[Math.floor(Math.random()*types.length)]);
-        newBoard.push(...line);
-      }
-      board=newBoard;
-
-      render(true);
-      update();
-    },250);
-  } else combo=0;
-
-  clearSelect();
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-}
-
-function showScore(val){
-  const el=document.createElement('div');
-  el.className='floating';
-  el.textContent='+'+val;
-  el.style.left='50%';
-  el.style.top='50%';
-  document.body.appendChild(el);
-  setTimeout(()=>el.remove(),1000);
-}
-
-function highlight(i){ document.querySelectorAll('.cell')[i].classList.add('linked'); }
-
-function clearSelect(){ selected=[]; document.querySelectorAll('.cell').forEach(c=>c.classList.remove('linked','pop')); }
-
-function render(squish=false){
-  document.querySelectorAll('.cell').forEach((cell,i)=>{
-    cell.className='cell '+board[i];
-    if(squish){
-      cell.classList.add('squish');
-      setTimeout(()=>cell.classList.remove('squish'),200);
+    let dx=player.x-e.x, dy=player.y-e.y;
+    if(Math.hypot(dx,dy)<15){
+      player.hp-=1;
     }
+  });
+
+  if(player.hp<=0) gameOver=true;
+}
+
+function gainXP(v){
+  player.xp+=v;
+  if(player.xp>=100){
+    player.xp=0;
+    player.lvl++;
+    levelUp();
+  }
+}
+
+function levelUp(){
+  document.getElementById("overlay").style.display="flex";
+  const choices=["攻撃速度UP","ドローン追加","回復"];
+  const box=document.getElementById("choices");
+  box.innerHTML="";
+  choices.forEach(c=>{
+    let b=document.createElement("button");
+    b.textContent=c;
+    b.onclick=()=>selectSkill(c);
+    box.appendChild(b);
   });
 }
 
-function update(){
-  if(hp<0) hp=0;
-  if(gauge>100) gauge=100;
-  document.getElementById('hp').textContent=hp;
-  document.getElementById('gauge-inner').style.width=gauge+'%';
-  document.getElementById('score').textContent='スコア: '+score;
-  document.getElementById('combo').textContent='コンボ: '+combo;
+function selectSkill(s){
+  if(s==="攻撃速度UP"){
+    // 速度UP
+  }
+  if(s==="ドローン追加"){
+    drones.push({x:player.x,y:player.y});
+    if(drones.length>=2){
+      // 合体（強化）
+      drones=[{x:player.x,y:player.y}];
+      bullets.push({x:player.x,y:player.y,speed:10});
+    }
+  }
+  if(s==="回復"){
+    player.hp=Math.min(player.maxHp,player.hp+30);
+  }
+  document.getElementById("overlay").style.display="none";
 }
 
-function special(){
-  if(gauge>=100){
-    hp-=30;
-    gauge=0;
-    update();
-    const flash=document.createElement('div');
-    flash.className='flash';
-    document.body.appendChild(flash);
-    setTimeout(()=>flash.remove(),500);
+function draw(){
+  ctx.clearRect(0,0,400,600);
+
+  // ぷにっと（サイズ変化）
+  let pulse=1+Math.sin(Date.now()/200)*0.1;
+
+  // プレイヤー
+  ctx.fillStyle="#0f0";
+  ctx.beginPath();
+  ctx.arc(player.x,player.y,player.size*pulse,0,Math.PI*2);
+  ctx.fill();
+
+  // 弾
+  ctx.fillStyle="#ff0";
+  bullets.forEach(b=>ctx.fillRect(b.x-2,b.y-5,4,10));
+
+  // 敵
+  ctx.fillStyle="#f00";
+  enemies.forEach(e=>{
+    ctx.beginPath();
+    ctx.arc(e.x,e.y,e.size*pulse,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  // ドローン
+  ctx.fillStyle="#0ff";
+  drones.forEach(d=>{
+    ctx.beginPath();
+    ctx.arc(d.x,d.y,6,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  // UI
+  document.getElementById("hp").style.width=(player.hp/player.maxHp*100)+"%";
+  document.getElementById("xp").style.width=(player.xp)+"%";
+
+  if(gameOver){
+    ctx.fillStyle="#fff";
+    ctx.fillText("GAME OVER",150,300);
   }
 }
 
-createBoard();
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
 </script>
 </body>
 </html>
