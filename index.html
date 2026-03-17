@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ぷにぷに風ゲーム</title>
+<style>
+  body { font-family: sans-serif; text-align: center; background:#f0f8ff; }
+  #game { display: grid; grid-template-columns: repeat(6, 60px); gap: 5px; justify-content: center; margin-top: 20px; }
+  .cell { width: 60px; height: 60px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff; cursor:pointer; }
+  #enemy { margin-top:20px; }
+  #gauge { width: 300px; height: 20px; border:1px solid #000; margin:10px auto; }
+  #gauge-inner { height:100%; width:0%; background:red; }
+</style>
+</head>
+<body>
+<h1>ぷにぷに風パズル</h1>
+<div id="enemy">敵HP: <span id="hp">100</span></div>
+<div id="gauge"><div id="gauge-inner"></div></div>
+<button onclick="special()">必殺技</button>
+<div id="game"></div>
+
+<script>
+const size = 6;
+const types = ['A','B','C','D'];
+let board = [];
+let hp = 100;
+let gauge = 0;
+
+function createBoard(){
+  const game = document.getElementById('game');
+  game.innerHTML = '';
+  board = [];
+  for(let i=0;i<size*size;i++){
+    const type = types[Math.floor(Math.random()*types.length)];
+    board.push(type);
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.style.background = color(type);
+    cell.textContent = type;
+    cell.dataset.index = i;
+    cell.onclick = () => select(i);
+    game.appendChild(cell);
+  }
+}
+
+function color(t){
+  return {A:'red',B:'blue',C:'green',D:'purple'}[t];
+}
+
+let selected = [];
+
+function select(i){
+  if(selected.includes(i)) return;
+  if(selected.length===0 || board[selected[0]]===board[i]){
+    selected.push(i);
+    document.querySelectorAll('.cell')[i].style.opacity = 0.5;
+  } else {
+    clearSelect();
+  }
+}
+
+document.addEventListener('mouseup', resolve);
+
+function resolve(){
+  if(selected.length>=3){
+    const dmg = selected.length * 2;
+    hp -= dmg;
+    gauge += selected.length * 5;
+    update();
+    selected.forEach(i=> board[i]=types[Math.floor(Math.random()*types.length)]);
+  }
+  clearSelect();
+  render();
+}
+
+function clearSelect(){
+  selected = [];
+  document.querySelectorAll('.cell').forEach(c=>c.style.opacity=1);
+}
+
+function render(){
+  document.querySelectorAll('.cell').forEach((cell,i)=>{
+    cell.textContent = board[i];
+    cell.style.background = color(board[i]);
+  });
+}
+
+function update(){
+  if(hp<0) hp=0;
+  if(gauge>100) gauge=100;
+  document.getElementById('hp').textContent = hp;
+  document.getElementById('gauge-inner').style.width = gauge+'%';
+}
+
+function special(){
+  if(gauge>=100){
+    hp -= 30;
+    gauge = 0;
+    update();
+  }
+}
+
+createBoard();
+</script>
+</body>
+</html>
