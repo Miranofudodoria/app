@@ -2,18 +2,19 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ダダサバ風ゲーム 草原版</title>
+<title>ダダサバ風ゲーム 最新版</title>
 <style>
 body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif;}
 canvas{background:#111;display:block;margin:10px auto;}
 button{margin:5px;padding:8px 16px;font-size:16px;}
 #ui{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:none;background:#222;padding:10px;border-radius:10px;}
 button span{margin-left:5px;}
+button:disabled{opacity:0.5;}
 </style>
 </head>
 <body>
 
-<h2>ダダサバ風ゲーム 🌿草原版🔥</h2>
+<h2>ダダサバ風ゲーム 🌿最新版🔥</h2>
 <canvas id="game" width="400" height="600"></canvas>
 <div id="ui"></div>
 
@@ -41,6 +42,9 @@ let enemies=[];
 let bullets=[];
 let xpOrbs=[];
 let effects=[];
+
+// XP必要量
+let xpRequired = 100;
 
 // 敵生成
 setInterval(()=>{
@@ -92,6 +96,8 @@ function update(){
   enemies.forEach(e=>{
     let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
     e.x+=dx/d*1.8;e.y+=dy/d*1.8;
+    // 敵に接触したらダメージ
+    if(!gamePaused && d<player.size+e.size){ player.hp -= 0.4; }
   });
 
   // 敵に弾が当たったときノックバック
@@ -114,7 +120,14 @@ function update(){
     if(d<15){xpOrbs.splice(oi,1); player.xp+=20;}
   });
 
-  while(player.xp>=100){player.xp-=100;player.level++;levelUp();}
+  // XPレベルアップ制
+  while(player.xp >= xpRequired){
+    player.xp -= xpRequired;
+    player.level++;
+    xpRequired = 100 + (player.level-1)*20; // レベル上がるごとに必要XP増
+    levelUp();
+  }
+
   if(player.hp<=0) gameOver=true;
 }
 
@@ -137,13 +150,19 @@ function levelUp(){
     const btn=document.createElement("button");
     let icon = s==="speed"?"⚡":s==="dmg"?"💥":"❤️";
     btn.innerHTML = icon + " <span>"+s+" "+getStars(skillLv[s])+"</span>";
+    // ★5スキルは選択不可
+    if(skillLv[s]>=5){
+      btn.disabled=true;
+    } else {
+      btn.onclick = ()=>{
+        applySkill(s);
+        resetKeys();
+        ui.style.display="none";
+        gamePaused=false;
+      };
+    }
+    // ★5は金色
     if(skillLv[s]===5) btn.style.color="gold";
-    btn.onclick = ()=>{
-      applySkill(s);
-      resetKeys();
-      ui.style.display="none";
-      gamePaused=false;
-    };
     ui.appendChild(btn);
   });
 }
@@ -185,7 +204,7 @@ function draw(){
   ctx.fillStyle="#333"; ctx.fillRect(10,10,200,10);
   ctx.fillStyle="#0f0"; ctx.fillRect(10,10,200*(player.hp/player.maxHp),10);
   ctx.fillStyle="#333"; ctx.fillRect(10,25,200,5);
-  ctx.fillStyle="#0ff"; ctx.fillRect(10,25,200*(player.xp/100),5);
+  ctx.fillStyle="#0ff"; ctx.fillRect(10,25,200*(player.xp/xpRequired),5);
 
   if(gameOver){ ctx.fillStyle="#fff"; ctx.font="30px sans-serif"; ctx.fillText("GAME OVER",90,300); }
 }
