@@ -2,37 +2,37 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ダダサバ風 完成版</title>
+<title>ダダサバ風 完全版（ボタンUI・キーリセット済み）</title>
 <style>
-body{margin:0;background:#000;color:#fff;text-align:center}
-canvas{background:#111;display:block;margin:10px auto}
+body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif;}
+canvas{background:#111;display:block;margin:10px auto;}
+button{margin:5px;padding:10px 20px;font-size:16px;}
+#ui{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:none;}
 </style>
 </head>
 <body>
 
 <h2>ダダサバ風ゲーム🔥</h2>
 <canvas id="game" width="400" height="600"></canvas>
+<div id="ui"></div> <!-- スキル選択UI -->
 
 <script>
 const c = document.getElementById("game");
 const ctx = c.getContext("2d");
 
-let player = {
-  x:200,y:300,size:10,
-  hp:100,maxHp:100,
-  xp:0,level:1
-};
-
+let player = {x:200,y:300,size:10,hp:100,maxHp:100,xp:0,level:1};
 let keys = {};
-window.addEventListener("keydown",e=>keys[e.key]=true);
-window.addEventListener("keyup",e=>keys[e.key]=false);
-
 let gameOver=false;
 let gamePaused=false;
 
-let skillLv={speed:0,dmg:0,heal:0};
-let evolution={machinegun:false, explosion:false};
+window.addEventListener("keydown", e => { if(!gamePaused) keys[e.key]=true; });
+window.addEventListener("keyup", e => { keys[e.key]=false; });
 
+function resetKeys(){ keys = {}; }
+
+// スキル
+let skillLv={speed:0,dmg:0,heal:0};
+let evolution={machinegun:false,explosion:false};
 let fireRate=300;
 let damage=1;
 
@@ -46,11 +46,7 @@ setInterval(()=>{
   if(gameOver) return;
   let ang=Math.random()*Math.PI*2;
   let dist=250;
-  enemies.push({
-    x:player.x+Math.cos(ang)*dist,
-    y:player.y+Math.sin(ang)*dist,
-    size:12
-  });
+  enemies.push({x:player.x+Math.cos(ang)*dist,y:player.y+Math.sin(ang)*dist,size:12});
 },600);
 
 // 自動攻撃
@@ -59,233 +55,119 @@ function tryFire(){
   fireTimer+=16;
   if(fireTimer<fireRate) return;
   fireTimer=0;
-
   if(enemies.length===0) return;
-
-  let target=enemies[0];
-  let dx=target.x-player.x;
-  let dy=target.y-player.y;
-  let d=Math.hypot(dx,dy);
-
-  bullets.push({
-    x:player.x,
-    y:player.y,
-    dx:dx/d,
-    dy:dy/d,
-    explode:evolution.explosion
-  });
+  let t=enemies[0];
+  let dx=t.x-player.x, dy=t.y-player.y, d=Math.hypot(dx,dy);
+  bullets.push({x:player.x,y:player.y,dx:dx/d,dy:dy/d,explode:evolution.explosion});
 }
 
 // 更新
 function update(){
   if(gameOver||gamePaused) return;
 
-  // ★移動
   let speed=3;
   if(keys["ArrowUp"]||keys["w"]) player.y-=speed;
   if(keys["ArrowDown"]||keys["s"]) player.y+=speed;
   if(keys["ArrowLeft"]||keys["a"]) player.x-=speed;
   if(keys["ArrowRight"]||keys["d"]) player.x+=speed;
-
-  // 画面制限
   player.x=Math.max(0,Math.min(400,player.x));
   player.y=Math.max(0,Math.min(600,player.y));
 
   tryFire();
 
-  bullets.forEach(b=>{
-    b.x+=b.dx*6;
-    b.y+=b.dy*6;
-  });
+  bullets.forEach(b=>{ b.x+=b.dx*6; b.y+=b.dy*6; });
+  enemies.forEach(e=>{ let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy); e.x+=dx/d*1.8; e.y+=dy/d*1.8; });
+  enemies.forEach(e=>{ if(Math.hypot(player.x-e.x,player.y-e.y)<player.size+e.size) player.hp-=0.4; });
 
-  // 敵追尾
-  enemies.forEach(e=>{
-    let dx=player.x-e.x;
-    let dy=player.y-e.y;
-    let d=Math.hypot(dx,dy);
-    e.x+=dx/d*1.8;
-    e.y+=dy/d*1.8;
-  });
-
-  // 接触ダメ
-  enemies.forEach(e=>{
-    let d=Math.hypot(player.x-e.x,player.y-e.y);
-    if(d<player.size+e.size){
-      player.hp-=0.4;
-    }
-  });
-
-  // 弾ヒット
   enemies.forEach((e,ei)=>{
     bullets.forEach((b,bi)=>{
-      let d=Math.hypot(e.x-b.x,e.y-b.y);
-      if(d<e.size){
+      if(Math.hypot(e.x-b.x,e.y-b.y)<e.size){
         effects.push({x:b.x,y:b.y,life:10});
-
-        if(b.explode){
-          enemies.forEach(en=>{
-            let d2=Math.hypot(en.x-b.x,en.y-b.y);
-            if(d2<60){
-              xpOrbs.push({x:en.x,y:en.y});
-            }
-          });
-        }
-
+        if(b.explode) enemies.forEach(en=>{ if(Math.hypot(en.x-b.x,en.y-b.y)<60) xpOrbs.push({x:en.x,y:en.y}); });
         xpOrbs.push({x:e.x,y:e.y});
-        enemies.splice(ei,1);
-        bullets.splice(bi,1);
+        enemies.splice(ei,1); bullets.splice(bi,1);
       }
     });
   });
 
-  // XP吸収
   xpOrbs.forEach((o,oi)=>{
-    let dx=player.x-o.x;
-    let dy=player.y-o.y;
-    let d=Math.hypot(dx,dy);
-
-    if(d<80){
-      o.x+=dx/d*3;
-      o.y+=dy/d*3;
-    }
-
-    if(d<15){
-      xpOrbs.splice(oi,1);
-      player.xp+=20;
-    }
+    let dx=player.x-o.x, dy=player.y-o.y, d=Math.hypot(dx,dy);
+    if(d<80){ o.x+=dx/d*3; o.y+=dy/d*3; }
+    if(d<15){ xpOrbs.splice(oi,1); player.xp+=20; }
   });
 
-  if(player.xp>=100){
-    player.xp=0;
-    player.level++;
-    levelUp();
-  }
-
+  if(player.xp>=100){ player.xp=0; player.level++; levelUp(); }
   if(player.hp<=0) gameOver=true;
 }
 
 // レベルアップ
-function getStars(n){
-  return "★".repeat(n)+"☆".repeat(5-n);
-}
+function getStars(n){ return "★".repeat(n)+"☆".repeat(5-n); }
 
 function levelUp(){
   gamePaused=true;
+  resetKeys(); // ★選択画面前にキーリセットで勝手な移動防止
 
-  let skills=["speed","dmg","heal"];
+  const ui = document.getElementById("ui");
+  ui.innerHTML=""; 
+  ui.style.display="block";
+
+  const skills=["speed","dmg","heal"];
   let choices=[];
-
   while(choices.length<3){
     let r=skills[Math.floor(Math.random()*skills.length)];
     if(!choices.includes(r)) choices.push(r);
   }
 
-  let text="スキル選択\n";
-  choices.forEach((c,i)=>{
-    text+=(i+1)+":"+c+" "+getStars(skillLv[c]+1)+"\n";
+  choices.forEach(s=>{
+    const btn = document.createElement("button");
+    btn.textContent = s+" "+getStars(skillLv[s]+1);
+    btn.onclick = () => {
+      applySkill(s);
+      resetKeys(); // ★ここでもキーを完全リセット
+      ui.style.display="none";
+      gamePaused=false;
+    };
+    ui.appendChild(btn);
   });
-
-  let sel=prompt(text);
-  applySkill(choices[sel-1]);
-
-  gamePaused=false;
 }
 
 // スキル適用
 function applySkill(s){
   if(skillLv[s]<5) skillLv[s]++;
-
   if(s==="speed") fireRate=Math.max(80,fireRate-40);
   if(s==="dmg") damage+=1;
   if(s==="heal") player.hp=Math.min(player.maxHp,player.hp+30);
-
   checkEvolution();
 }
 
 // 進化
 function checkEvolution(){
-  if(skillLv.speed>=5 && skillLv.dmg>=5){
-    evolution.machinegun=true;
-    fireRate=80;
-  }
-  if(skillLv.dmg>=5 && skillLv.heal>=5){
-    evolution.explosion=true;
-  }
+  if(skillLv.speed>=5 && skillLv.dmg>=5){ evolution.machinegun=true; fireRate=80; }
+  if(skillLv.dmg>=5 && skillLv.heal>=5) evolution.explosion=true;
 }
 
 // 描画
 function draw(){
-  ctx.fillStyle="#000";
-  ctx.fillRect(0,0,400,600);
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,400,600);
 
-  // ぷにプレイヤー
   let scale=1+Math.sin(Date.now()/100)*0.05;
-  ctx.save();
-  ctx.translate(player.x,player.y);
-  ctx.scale(1,scale);
-  ctx.fillStyle="#0f0";
-  ctx.beginPath();
-  ctx.arc(0,0,player.size,0,Math.PI*2);
-  ctx.fill();
-  ctx.restore();
+  ctx.save(); ctx.translate(player.x,player.y); ctx.scale(1,scale);
+  ctx.fillStyle="#0f0"; ctx.beginPath(); ctx.arc(0,0,player.size,0,Math.PI*2); ctx.fill(); ctx.restore();
 
-  // 敵
-  enemies.forEach(e=>{
-    let s=1+Math.sin(Date.now()/120+e.x)*0.05;
-    ctx.save();
-    ctx.translate(e.x,e.y);
-    ctx.scale(1,s);
-    ctx.fillStyle="#f00";
-    ctx.beginPath();
-    ctx.arc(0,0,e.size,0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  });
+  enemies.forEach(e=>{ let s=1+Math.sin(Date.now()/120+e.x)*0.05; ctx.save(); ctx.translate(e.x,e.y); ctx.scale(1,s); ctx.fillStyle="#f00"; ctx.beginPath(); ctx.arc(0,0,e.size,0,Math.PI*2); ctx.fill(); ctx.restore(); });
 
-  // 弾
-  ctx.fillStyle="#ff0";
-  bullets.forEach(b=>{
-    ctx.beginPath();
-    ctx.arc(b.x,b.y,3,0,Math.PI*2);
-    ctx.fill();
-  });
+  ctx.fillStyle="#ff0"; bullets.forEach(b=>{ ctx.beginPath(); ctx.arc(b.x,b.y,3,0,Math.PI*2); ctx.fill(); });
+  ctx.fillStyle="#0ff"; xpOrbs.forEach(o=>{ ctx.beginPath(); ctx.arc(o.x,o.y,5,0,Math.PI*2); ctx.fill(); });
 
-  // XP
-  ctx.fillStyle="#0ff";
-  xpOrbs.forEach(o=>{
-    ctx.beginPath();
-    ctx.arc(o.x,o.y,5,0,Math.PI*2);
-    ctx.fill();
-  });
+  effects.forEach((ef,i)=>{ ctx.fillStyle="yellow"; ctx.beginPath(); ctx.arc(ef.x,ef.y,10-ef.life,0,Math.PI*2); ctx.fill(); ef.life--; if(ef.life<=0) effects.splice(i,1); });
 
-  // エフェクト
-  effects.forEach((ef,i)=>{
-    ctx.fillStyle="yellow";
-    ctx.beginPath();
-    ctx.arc(ef.x,ef.y,10-ef.life,0,Math.PI*2);
-    ctx.fill();
-    ef.life--;
-    if(ef.life<=0) effects.splice(i,1);
-  });
+  ctx.fillStyle="#333"; ctx.fillRect(10,10,200,10);
+  ctx.fillStyle="#0f0"; ctx.fillRect(10,10,200*(player.hp/player.maxHp),10);
 
-  // HPバー
-  ctx.fillStyle="#333";
-  ctx.fillRect(10,10,200,10);
-  ctx.fillStyle="#0f0";
-  ctx.fillRect(10,10,200*(player.hp/player.maxHp),10);
-
-  if(gameOver){
-    ctx.fillStyle="#fff";
-    ctx.font="30px sans-serif";
-    ctx.fillText("GAME OVER",90,300);
-  }
+  if(gameOver){ ctx.fillStyle="#fff"; ctx.font="30px sans-serif"; ctx.fillText("GAME OVER",90,300); }
 }
 
-function loop(){
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
 loop();
 </script>
 
