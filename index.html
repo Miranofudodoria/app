@@ -23,10 +23,13 @@ let player = {
   xp:0,level:1
 };
 
+let keys = {};
+window.addEventListener("keydown",e=>keys[e.key]=true);
+window.addEventListener("keyup",e=>keys[e.key]=false);
+
 let gameOver=false;
 let gamePaused=false;
 
-// スキル
 let skillLv={speed:0,dmg:0,heal:0};
 let evolution={machinegun:false, explosion:false};
 
@@ -42,13 +45,13 @@ let effects=[];
 setInterval(()=>{
   if(gameOver) return;
   let ang=Math.random()*Math.PI*2;
-  let dist=200;
+  let dist=250;
   enemies.push({
     x:player.x+Math.cos(ang)*dist,
     y:player.y+Math.sin(ang)*dist,
-    size:10
+    size:12
   });
-},800);
+},600);
 
 // 自動攻撃
 let fireTimer=0;
@@ -63,7 +66,6 @@ function tryFire(){
   let dx=target.x-player.x;
   let dy=target.y-player.y;
   let d=Math.hypot(dx,dy);
-  if(d===0) return;
 
   bullets.push({
     x:player.x,
@@ -78,11 +80,22 @@ function tryFire(){
 function update(){
   if(gameOver||gamePaused) return;
 
+  // ★移動
+  let speed=3;
+  if(keys["ArrowUp"]||keys["w"]) player.y-=speed;
+  if(keys["ArrowDown"]||keys["s"]) player.y+=speed;
+  if(keys["ArrowLeft"]||keys["a"]) player.x-=speed;
+  if(keys["ArrowRight"]||keys["d"]) player.x+=speed;
+
+  // 画面制限
+  player.x=Math.max(0,Math.min(400,player.x));
+  player.y=Math.max(0,Math.min(600,player.y));
+
   tryFire();
 
   bullets.forEach(b=>{
-    b.x+=b.dx*5;
-    b.y+=b.dy*5;
+    b.x+=b.dx*6;
+    b.y+=b.dy*6;
   });
 
   // 敵追尾
@@ -90,16 +103,15 @@ function update(){
     let dx=player.x-e.x;
     let dy=player.y-e.y;
     let d=Math.hypot(dx,dy);
-    if(d===0) return;
-    e.x+=dx/d*1.5;
-    e.y+=dy/d*1.5;
+    e.x+=dx/d*1.8;
+    e.y+=dy/d*1.8;
   });
 
-  // 衝突
+  // 接触ダメ
   enemies.forEach(e=>{
     let d=Math.hypot(player.x-e.x,player.y-e.y);
     if(d<player.size+e.size){
-      player.hp-=0.3;
+      player.hp-=0.4;
     }
   });
 
@@ -113,7 +125,7 @@ function update(){
         if(b.explode){
           enemies.forEach(en=>{
             let d2=Math.hypot(en.x-b.x,en.y-b.y);
-            if(d2<50){
+            if(d2<60){
               xpOrbs.push({x:en.x,y:en.y});
             }
           });
@@ -143,16 +155,13 @@ function update(){
     }
   });
 
-  // レベルアップ
   if(player.xp>=100){
     player.xp=0;
     player.level++;
     levelUp();
   }
 
-  if(player.hp<=0){
-    gameOver=true;
-  }
+  if(player.hp<=0) gameOver=true;
 }
 
 // レベルアップ
@@ -209,7 +218,7 @@ function draw(){
   ctx.fillStyle="#000";
   ctx.fillRect(0,0,400,600);
 
-  // ぷに
+  // ぷにプレイヤー
   let scale=1+Math.sin(Date.now()/100)*0.05;
   ctx.save();
   ctx.translate(player.x,player.y);
@@ -265,15 +274,13 @@ function draw(){
   ctx.fillStyle="#0f0";
   ctx.fillRect(10,10,200*(player.hp/player.maxHp),10);
 
-  // GAME OVER
   if(gameOver){
     ctx.fillStyle="#fff";
     ctx.font="30px sans-serif";
-    ctx.fillText("GAME OVER",100,300);
+    ctx.fillText("GAME OVER",90,300);
   }
 }
 
-// ループ
 function loop(){
   update();
   draw();
