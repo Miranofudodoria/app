@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ダダサバ風ゲーム 新スキル追加版</title>
+<title>ダダサバ風ゲーム スキル進化版</title>
 <style>
 body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif;}
 canvas{background:#111;display:block;margin:10px auto;}
@@ -13,19 +13,15 @@ button:disabled{opacity:0.5;}
 </style>
 </head>
 <body>
-
-<h2>ダダサバ風ゲーム 🌿新スキル版🔥</h2>
+<h2>ダダサバ風ゲーム 🌿スキル進化・再生成版🔥</h2>
 <canvas id="game" width="400" height="600"></canvas>
 <div id="ui"></div>
-
 <script>
 const c=document.getElementById("game");
 const ctx=c.getContext("2d");
 
 let player={x:200,y:300,size:10,hp:100,maxHp:100,xp:0,level:1};
-let keys={};
-let gameOver=false;
-let gamePaused=false;
+let keys={},gameOver=false,gamePaused=false;
 
 window.addEventListener("keydown",e=>{if(!gamePaused) keys[e.key]=true;});
 window.addEventListener("keyup",e=>{keys[e.key]=false;});
@@ -34,10 +30,9 @@ function resetKeys(){keys={};}
 // スキル
 let skillLv={speed:0,dmg:0,heal:0,guardian:0,soccer:0,fire:0};
 let evolution={machinegun:false,explosion:false};
-let fireRate=200;
-let damage=1;
+let fireRate=200,damage=1;
 
-// 敵と弾とスキルエフェクト
+// 敵、弾、XP、エフェクト、スキル
 let enemies=[], bullets=[], xpOrbs=[], effects=[], activeSkills=[];
 
 // XP
@@ -65,24 +60,32 @@ function tryFire(){
 
 // 草原背景
 function drawBackground(){
-  ctx.fillStyle="#228B22";
-  ctx.fillRect(0,0,400,600);
+  ctx.fillStyle="#228B22"; ctx.fillRect(0,0,400,600);
   let colors=["#2E8B57","#32CD32","#006400"];
-  for(let i=0;i<50;i++){
-    ctx.fillStyle = colors[Math.floor(Math.random()*colors.length)];
-    let x=Math.random()*400;
-    let y=Math.random()*600;
-    ctx.fillRect(x,y,2,6);
-  }
+  for(let i=0;i<50;i++){ ctx.fillStyle=colors[Math.floor(Math.random()*colors.length)]; ctx.fillRect(Math.random()*400,Math.random()*600,2,6); }
 }
 
-// スキル発動関数
-function spawnGuardian(){ activeSkills.push({type:"guardian",angle:0,radius:25,dmg:damage,life:300}); }
-function spawnSoccerBall(){ 
-  let dx=Math.random()*4-2, dy=Math.random()*4-2;
-  activeSkills.push({type:"soccer",x:player.x,y:player.y,dx:dx,dy:dy,radius:8,dmg:damage});
+// スキル生成関数
+function spawnGuardian(){ 
+  let count = Math.min(5,1+skillLv.guardian); 
+  for(let i=0;i<count;i++){
+    activeSkills.push({type:"guardian",angle:i*(Math.PI*2/count),radius:25,dmg:damage,life:300,respawn:60});
+  }
 }
-function spawnFirePotion(){ activeSkills.push({type:"fire",x:player.x,y:player.y,radius:40,dmg:damage,life:200}); }
+function spawnSoccerBall(){ 
+  let count = (skillLv.soccer>=3)?2:1;
+  for(let i=0;i<count;i++){
+    let dx=Math.random()*4-2, dy=Math.random()*4-2;
+    activeSkills.push({type:"soccer",x:player.x,y:player.y,dx:dx,dy:dy,radius:12,dmg:damage});
+  }
+}
+function spawnFirePotion(){ 
+  let count = Math.min(5,1+skillLv.fire);
+  for(let i=0;i<count;i++){
+    let x=Math.random()*400, y=Math.random()*600;
+    activeSkills.push({type:"fire",x:x,y:y,radius:40,dmg:damage,life:200,respawn:80});
+  }
+}
 
 // 更新
 function update(){
@@ -92,8 +95,7 @@ function update(){
   if(keys["ArrowDown"]||keys["s"]) player.y+=speed;
   if(keys["ArrowLeft"]||keys["a"]) player.x-=speed;
   if(keys["ArrowRight"]||keys["d"]) player.x+=speed;
-  player.x=Math.max(0,Math.min(400,player.x));
-  player.y=Math.max(0,Math.min(600,player.y));
+  player.x=Math.max(0,Math.min(400,player.x)); player.y=Math.max(0,Math.min(600,player.y));
 
   tryFire();
 
@@ -101,7 +103,7 @@ function update(){
   enemies.forEach(e=>{
     let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
     e.x+=dx/d*1.8;e.y+=dy/d*1.8;
-    if(!gamePaused && d<player.size+e.size){ player.hp -= 0.4; }
+    if(!gamePaused && d<player.size+e.size){ player.hp-=0.4; }
   });
 
   // 弾ヒット
@@ -109,8 +111,7 @@ function update(){
     bullets.forEach((b,bi)=>{
       if(Math.hypot(e.x-b.x,e.y-b.y)<e.size){
         effects.push({x:b.x,y:b.y,life:10});
-        e.x += b.dx * b.knockback;
-        e.y += b.dy * b.knockback;
+        e.x+=b.dx*b.knockback; e.y+=b.dy*b.knockback;
         if(b.explode) enemies.forEach(en=>{ if(Math.hypot(en.x-b.x,en.y-b.y)<60) xpOrbs.push({x:en.x,y:en.y}); });
         xpOrbs.push({x:e.x,y:e.y});
         enemies.splice(ei,1); bullets.splice(bi,1);
@@ -118,33 +119,24 @@ function update(){
     });
   });
 
-  // XP取得（レベル依存）
+  // XP取得
   xpOrbs.forEach((o,oi)=>{
     let dx=player.x-o.x,dy=player.y-o.y,d=Math.hypot(dx,dy);
     if(d<80){ o.x+=dx/d*3; o.y+=dy/d*3; }
-    if(d<15){ 
-        xpOrbs.splice(oi,1);
-        let xpGain = Math.max(5, 20 - (player.level-1)*2);
-        player.xp += xpGain;
-    }
+    if(d<15){ xpOrbs.splice(oi,1); let xpGain=Math.max(5,20-(player.level-1)*2); player.xp+=xpGain; }
   });
 
-  // XPレベルアップ制
-  while(player.xp >= xpRequired){
-    player.xp -= xpRequired;
-    player.level++;
-    xpRequired = 100 + (player.level-1)*20;
-    levelUp();
-  }
+  // レベルアップ
+  while(player.xp>=xpRequired){ player.xp-=xpRequired; player.level++; xpRequired=100+(player.level-1)*20; levelUp(); }
 
-  // スキルエフェクト更新
+  // スキル更新
   activeSkills.forEach((s,si)=>{
     if(s.type==="guardian"){
-      s.angle += 0.2;
+      s.angle+=0.2;
       let gx = player.x + Math.cos(s.angle)*s.radius;
       let gy = player.y + Math.sin(s.angle)*s.radius;
       enemies.forEach((e,ei)=>{ if(Math.hypot(e.x-gx,e.y-gy)<e.size){ enemies.splice(ei,1); xpOrbs.push({x:e.x,y:e.y}); }});
-      s.life--; if(s.life<=0) activeSkills.splice(si,1);
+      s.life--; if(s.life<=0){ s.life=300; s.angle=0; } // 再生成
     }
     if(s.type==="soccer"){
       s.x+=s.dx*5; s.y+=s.dy*5;
@@ -153,15 +145,15 @@ function update(){
       enemies.forEach((e,ei)=>{ if(Math.hypot(e.x-s.x,e.y-s.y)<e.size){ enemies.splice(ei,1); xpOrbs.push({x:e.x,y:e.y}); }});
     }
     if(s.type==="fire"){
+      s.life--; if(s.life<=0){ s.life=200; s.x=Math.random()*400; s.y=Math.random()*600; } // 再生成
       enemies.forEach((e,ei)=>{ if(Math.hypot(e.x-s.x,e.y-s.y)<s.radius){ enemies.splice(ei,1); xpOrbs.push({x:e.x,y:e.y}); }});
-      s.life--; if(s.life<=0) activeSkills.splice(si,1);
     }
   });
 
   if(player.hp<=0) gameOver=true;
 }
 
-// レベルアップ
+// レベルアップUI
 function getStars(n){ return "★".repeat(n)+"☆".repeat(5-n); }
 function levelUp(){
   gamePaused=true; resetKeys();
@@ -240,6 +232,5 @@ function draw(){
 function loop(){update();draw();requestAnimationFrame(loop);}
 loop();
 </script>
-
 </body>
 </html>
