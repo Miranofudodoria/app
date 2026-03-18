@@ -27,6 +27,11 @@ button{margin:5px;padding:10px}
 <div id="overlay"><div id="card"><h3>スキル選択</h3><div id="choices"></div></div></div>
 <script>
 const c=document.getElementById("game"),ctx=c.getContext("2d");
+// UI要素取得（これが無いとクラッシュして真っ暗になる）
+const hp = document.getElementById("hp");
+const xp = document.getElementById("xp");
+// フラグ初期化
+window.hasExplosion = false;
 let player={x:0,y:0,size:12,hp:100,maxHp:100,xp:0,lvl:1};
 let camera={x:0,y:0};
 let enemies=[],bullets=[],xpOrbs=[],lasers=[];
@@ -222,6 +227,7 @@ function selectSkill(k){
 }
 
 function draw(){
+ if(!player) return;
  ctx.clearRect(0,0,400,600);
 
  // カメラバグ対策（とりあえず中央固定）
