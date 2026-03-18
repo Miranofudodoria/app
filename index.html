@@ -2,40 +2,41 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ダダサバ風 完全版（ボタンUI・キーリセット済み）</title>
+<title>ダダサバ風ゲーム 草原版</title>
 <style>
 body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif;}
 canvas{background:#111;display:block;margin:10px auto;}
-button{margin:5px;padding:10px 20px;font-size:16px;}
-#ui{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:none;}
+button{margin:5px;padding:8px 16px;font-size:16px;}
+#ui{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:none;background:#222;padding:10px;border-radius:10px;}
+button span{margin-left:5px;}
 </style>
 </head>
 <body>
 
-<h2>ダダサバ風ゲーム🔥</h2>
+<h2>ダダサバ風ゲーム 🌿草原版🔥</h2>
 <canvas id="game" width="400" height="600"></canvas>
-<div id="ui"></div> <!-- スキル選択UI -->
+<div id="ui"></div>
 
 <script>
-const c = document.getElementById("game");
-const ctx = c.getContext("2d");
+const c=document.getElementById("game");
+const ctx=c.getContext("2d");
 
-let player = {x:200,y:300,size:10,hp:100,maxHp:100,xp:0,level:1};
-let keys = {};
+let player={x:200,y:300,size:10,hp:100,maxHp:100,xp:0,level:1};
+let keys={};
 let gameOver=false;
 let gamePaused=false;
 
-window.addEventListener("keydown", e => { if(!gamePaused) keys[e.key]=true; });
-window.addEventListener("keyup", e => { keys[e.key]=false; });
-
-function resetKeys(){ keys = {}; }
+window.addEventListener("keydown",e=>{if(!gamePaused) keys[e.key]=true;});
+window.addEventListener("keyup",e=>{keys[e.key]=false;});
+function resetKeys(){keys={};}
 
 // スキル
 let skillLv={speed:0,dmg:0,heal:0};
 let evolution={machinegun:false,explosion:false};
-let fireRate=300;
+let fireRate=200;
 let damage=1;
 
+// 敵と弾
 let enemies=[];
 let bullets=[];
 let xpOrbs=[];
@@ -57,15 +58,27 @@ function tryFire(){
   fireTimer=0;
   if(enemies.length===0) return;
   let t=enemies[0];
-  let dx=t.x-player.x, dy=t.y-player.y, d=Math.hypot(dx,dy);
-  bullets.push({x:player.x,y:player.y,dx:dx/d,dy:dy/d,explode:evolution.explosion});
+  let dx=t.x-player.x,dy=t.y-player.y,d=Math.hypot(dx,dy);
+  bullets.push({x:player.x,y:player.y,dx:dx/d,dy:dy/d,explode:evolution.explosion,knockback:5});
+}
+
+// 草原背景
+function drawBackground(){
+  ctx.fillStyle="#228B22";
+  ctx.fillRect(0,0,400,600);
+  let colors=["#2E8B57","#32CD32","#006400"];
+  for(let i=0;i<50;i++){
+    ctx.fillStyle = colors[Math.floor(Math.random()*colors.length)];
+    let x=Math.random()*400;
+    let y=Math.random()*600;
+    ctx.fillRect(x,y,2,6);
+  }
 }
 
 // 更新
 function update(){
   if(gameOver||gamePaused) return;
-
-  let speed=3;
+  let speed=5;
   if(keys["ArrowUp"]||keys["w"]) player.y-=speed;
   if(keys["ArrowDown"]||keys["s"]) player.y+=speed;
   if(keys["ArrowLeft"]||keys["a"]) player.x-=speed;
@@ -75,14 +88,19 @@ function update(){
 
   tryFire();
 
-  bullets.forEach(b=>{ b.x+=b.dx*6; b.y+=b.dy*6; });
-  enemies.forEach(e=>{ let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy); e.x+=dx/d*1.8; e.y+=dy/d*1.8; });
-  enemies.forEach(e=>{ if(Math.hypot(player.x-e.x,player.y-e.y)<player.size+e.size) player.hp-=0.4; });
+  bullets.forEach(b=>{b.x+=b.dx*9;b.y+=b.dy*9;});
+  enemies.forEach(e=>{
+    let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
+    e.x+=dx/d*1.8;e.y+=dy/d*1.8;
+  });
 
+  // 敵に弾が当たったときノックバック
   enemies.forEach((e,ei)=>{
     bullets.forEach((b,bi)=>{
       if(Math.hypot(e.x-b.x,e.y-b.y)<e.size){
         effects.push({x:b.x,y:b.y,life:10});
+        e.x += b.dx * b.knockback;
+        e.y += b.dy * b.knockback;
         if(b.explode) enemies.forEach(en=>{ if(Math.hypot(en.x-b.x,en.y-b.y)<60) xpOrbs.push({x:en.x,y:en.y}); });
         xpOrbs.push({x:e.x,y:e.y});
         enemies.splice(ei,1); bullets.splice(bi,1);
@@ -91,25 +109,22 @@ function update(){
   });
 
   xpOrbs.forEach((o,oi)=>{
-    let dx=player.x-o.x, dy=player.y-o.y, d=Math.hypot(dx,dy);
-    if(d<80){ o.x+=dx/d*3; o.y+=dy/d*3; }
-    if(d<15){ xpOrbs.splice(oi,1); player.xp+=20; }
+    let dx=player.x-o.x,dy=player.y-o.y,d=Math.hypot(dx,dy);
+    if(d<80){o.x+=dx/d*3;o.y+=dy/d*3;}
+    if(d<15){xpOrbs.splice(oi,1); player.xp+=20;}
   });
 
-  if(player.xp>=100){ player.xp=0; player.level++; levelUp(); }
+  while(player.xp>=100){player.xp-=100;player.level++;levelUp();}
   if(player.hp<=0) gameOver=true;
 }
 
 // レベルアップ
 function getStars(n){ return "★".repeat(n)+"☆".repeat(5-n); }
-
 function levelUp(){
   gamePaused=true;
-  resetKeys(); // ★選択画面前にキーリセットで勝手な移動防止
-
-  const ui = document.getElementById("ui");
-  ui.innerHTML=""; 
-  ui.style.display="block";
+  resetKeys();
+  const ui=document.getElementById("ui");
+  ui.innerHTML=""; ui.style.display="block";
 
   const skills=["speed","dmg","heal"];
   let choices=[];
@@ -119,11 +134,13 @@ function levelUp(){
   }
 
   choices.forEach(s=>{
-    const btn = document.createElement("button");
-    btn.textContent = s+" "+getStars(skillLv[s]+1);
-    btn.onclick = () => {
+    const btn=document.createElement("button");
+    let icon = s==="speed"?"⚡":s==="dmg"?"💥":"❤️";
+    btn.innerHTML = icon + " <span>"+s+" "+getStars(skillLv[s])+"</span>";
+    if(skillLv[s]===5) btn.style.color="gold";
+    btn.onclick = ()=>{
       applySkill(s);
-      resetKeys(); // ★ここでもキーを完全リセット
+      resetKeys();
       ui.style.display="none";
       gamePaused=false;
     };
@@ -148,13 +165,17 @@ function checkEvolution(){
 
 // 描画
 function draw(){
-  ctx.fillStyle="#000"; ctx.fillRect(0,0,400,600);
+  drawBackground();
 
   let scale=1+Math.sin(Date.now()/100)*0.05;
   ctx.save(); ctx.translate(player.x,player.y); ctx.scale(1,scale);
   ctx.fillStyle="#0f0"; ctx.beginPath(); ctx.arc(0,0,player.size,0,Math.PI*2); ctx.fill(); ctx.restore();
 
-  enemies.forEach(e=>{ let s=1+Math.sin(Date.now()/120+e.x)*0.05; ctx.save(); ctx.translate(e.x,e.y); ctx.scale(1,s); ctx.fillStyle="#f00"; ctx.beginPath(); ctx.arc(0,0,e.size,0,Math.PI*2); ctx.fill(); ctx.restore(); });
+  enemies.forEach(e=>{
+    let s=1+Math.sin(Date.now()/120+e.x)*0.05;
+    ctx.save();ctx.translate(e.x,e.y);ctx.scale(1,s);
+    ctx.fillStyle="#f00";ctx.beginPath();ctx.arc(0,0,e.size,0,Math.PI*2);ctx.fill();ctx.restore();
+  });
 
   ctx.fillStyle="#ff0"; bullets.forEach(b=>{ ctx.beginPath(); ctx.arc(b.x,b.y,3,0,Math.PI*2); ctx.fill(); });
   ctx.fillStyle="#0ff"; xpOrbs.forEach(o=>{ ctx.beginPath(); ctx.arc(o.x,o.y,5,0,Math.PI*2); ctx.fill(); });
@@ -163,11 +184,13 @@ function draw(){
 
   ctx.fillStyle="#333"; ctx.fillRect(10,10,200,10);
   ctx.fillStyle="#0f0"; ctx.fillRect(10,10,200*(player.hp/player.maxHp),10);
+  ctx.fillStyle="#333"; ctx.fillRect(10,25,200,5);
+  ctx.fillStyle="#0ff"; ctx.fillRect(10,25,200*(player.xp/100),5);
 
   if(gameOver){ ctx.fillStyle="#fff"; ctx.font="30px sans-serif"; ctx.fillText("GAME OVER",90,300); }
 }
 
-function loop(){ update(); draw(); requestAnimationFrame(loop); }
+function loop(){update();draw();requestAnimationFrame(loop);}
 loop();
 </script>
 
