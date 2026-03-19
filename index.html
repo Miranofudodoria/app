@@ -5,11 +5,23 @@
 <style>
 body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif;}
 canvas{display:block;margin:10px auto;background:#111;}
+#ui{
+ position:absolute;
+ top:50%;
+ left:50%;
+ transform:translate(-50%,-50%);
+ background:#222;
+ padding:10px;
+ border-radius:10px;
+ display:none;
+}
+button{margin:5px;padding:8px 16px;}
 </style>
 </head>
 <body>
 
 <canvas id="game" width="400" height="600"></canvas>
+<div id="ui"></div>
 
 <script>
 const c=document.getElementById("game");
@@ -20,64 +32,64 @@ let enemies=[],bullets=[],xpOrbs=[];
 let damage=2;
 let xpRequired=100;
 let keys={};
+let gamePaused=false;
 
-window.addEventListener("keydown",e=>keys[e.key]=true);
+window.addEventListener("keydown",e=>{if(!gamePaused) keys[e.key]=true;});
 window.addEventListener("keyup",e=>keys[e.key]=false);
+function resetKeys(){keys={};}
 
-// 🔥 敵生成（種類あり）
+// 敵生成（調整済み）
 setInterval(()=>{
+  if(gamePaused) return;
+
   let ang=Math.random()*Math.PI*2;
   let dist=250;
-
   let type=Math.random();
-
   let enemy;
 
   if(type<0.6){
-    // 雑魚
     enemy={
       x:player.x+Math.cos(ang)*dist,
       y:player.y+Math.sin(ang)*dist,
       size:10,
-      hp:5+player.level*1.2,
-      speed:2,
+      hp:3 + player.level*0.8,
+      speed:1.5,
       color:"#f00"
     };
   }else if(type<0.85){
-    // 高速
     enemy={
       x:player.x+Math.cos(ang)*dist,
       y:player.y+Math.sin(ang)*dist,
       size:8,
-      hp:4+player.level,
-      speed:3.5,
+      hp:2 + player.level*0.6,
+      speed:2.5,
       color:"#ff8800"
     };
   }else{
-    // タンク
     enemy={
       x:player.x+Math.cos(ang)*dist,
       y:player.y+Math.sin(ang)*dist,
       size:16,
-      hp:15+player.level*2,
-      speed:1,
+      hp:8 + player.level*1.5,
+      speed:0.8,
       color:"#8800ff"
     };
   }
 
   enemies.push(enemy);
-},500);
+},600);
 
-// 🔥 攻撃
+// 自動攻撃
 setInterval(()=>{
-  if(enemies.length===0)return;
+  if(enemies.length===0 || gamePaused)return;
   let t=enemies[0];
   let dx=t.x-player.x,dy=t.y-player.y,d=Math.hypot(dx,dy);
   bullets.push({x:player.x,y:player.y,dx:dx/d,dy:dy/d});
-},200);
+},250);
 
 // 更新
 function update(){
+  if(gamePaused) return;
 
   // 移動
   if(keys["ArrowUp"])player.y-=4;
@@ -97,13 +109,12 @@ function update(){
     e.x+=dx/d*e.speed;
     e.y+=dy/d*e.speed;
 
-    // 接触ダメージ
     if(d<player.size+e.size){
       player.hp-=0.3;
     }
   });
 
-  // 💥 衝突（HP制）
+  // 衝突（HP制）
   enemies.forEach((e,ei)=>{
     bullets.forEach((b,bi)=>{
       if(Math.hypot(e.x-b.x,e.y-b.y)<e.size){
@@ -119,14 +130,16 @@ function update(){
     });
   });
 
-  // XP取得
+  // XP（吸いすぎ防止）
   xpOrbs.forEach((o,oi)=>{
     let dx=player.x-o.x,dy=player.y-o.y,d=Math.hypot(dx,dy);
+
     if(d<15){
       xpOrbs.splice(oi,1);
       let xpGain=Math.max(5,20-(player.level-1)*2);
       player.xp+=xpGain;
-    }else{
+
+    } else if(d<100){
       o.x+=dx/d*3;
       o.y+=dy/d*3;
     }
@@ -137,14 +150,43 @@ function update(){
     player.xp-=xpRequired;
     player.level++;
     xpRequired=100+(player.level-1)*25;
-    damage+=1; // レベルで火力UP
+    levelUp();
+  }
+
+  if(player.hp<=0) gamePaused=true;
+}
+
+// レベルアップUI
+function levelUp(){
+  gamePaused=true;
+  resetKeys();
+
+  const ui=document.getElementById("ui");
+  ui.innerHTML="";
+  ui.style.display="block";
+
+  const skills=["攻撃力UP","回復","攻撃速度UP"];
+  
+  for(let i=0;i<3;i++){
+    let s=skills[Math.floor(Math.random()*skills.length)];
+    const btn=document.createElement("button");
+    btn.innerText=s;
+
+    btn.onclick=()=>{
+      if(s==="攻撃力UP") damage+=1;
+      if(s==="回復") player.hp=Math.min(player.maxHp,player.hp+30);
+      if(s==="攻撃速度UP"){}
+
+      ui.style.display="none";
+      gamePaused=false;
+    };
+
+    ui.appendChild(btn);
   }
 }
 
 // 描画
 function draw(){
-
-  // 草原
   ctx.fillStyle="#228B22";
   ctx.fillRect(0,0,400,600);
 
@@ -160,12 +202,6 @@ function draw(){
     ctx.beginPath();
     ctx.arc(e.x,e.y,e.size,0,Math.PI*2);
     ctx.fill();
-
-    // HPバー
-    ctx.fillStyle="#000";
-    ctx.fillRect(e.x-10,e.y-15,20,3);
-    ctx.fillStyle="#0f0";
-    ctx.fillRect(e.x-10,e.y-15,20*(e.hp/(15+player.level*2)),3);
   });
 
   // 弾
@@ -198,7 +234,6 @@ function draw(){
   ctx.fillStyle="#fff";
   ctx.fillText("Lv "+player.level,220,30);
 
-  // ゲームオーバー
   if(player.hp<=0){
     ctx.fillStyle="#fff";
     ctx.font="30px sans-serif";
